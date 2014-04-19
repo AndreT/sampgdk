@@ -137,20 +137,20 @@ static int AMXAPI amx_FindPublic_(AMX *amx, const char *name, int *index) {
 }
 
 static int AMXAPI amx_Exec_(AMX *amx, cell *retval, int index) {
-  bool proceed;
-  int error;
-
-  subhook_remove(amx_Exec_hook);
-  subhook_install(amx_Callback_hook);
-
-  proceed = true;
+  bool proceed = true;
+  int error = AMX_ERR_NONE;
 
   /* Since filterscripts don't use main() we can assume that the AMX
    * that executes main() is indeed the main AMX i.e. the gamemode.
    */
   if (index == AMX_EXEC_MAIN) {
-    main_amx = amx;
-    sampgdk_callback_invoke(main_amx, "OnGameModeInit", retval);
+    /* This extra check is needed in order to stop OnGameModeInit()
+     * from being called twice in a row after a gmx.
+     */
+    if (main_amx != amx && amx != NULL) {
+      sampgdk_callback_invoke(amx, "OnGameModeInit", retval);
+      main_amx = amx;
+    }
   } else {
     if (index != AMX_EXEC_CONT && public_name != NULL
         && (amx == main_amx || amx == sampgdk_fakeamx_amx())) {
@@ -158,7 +158,8 @@ static int AMXAPI amx_Exec_(AMX *amx, cell *retval, int index) {
     }
   }
 
-  error = AMX_ERR_NONE;
+  subhook_remove(amx_Exec_hook);
+  subhook_install(amx_Callback_hook);
 
   if (proceed && index != AMX_EXEC_GDK) {
     error = amx_Exec(amx, retval, index);
